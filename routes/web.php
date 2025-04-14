@@ -47,6 +47,7 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('Profile/Edit');
     })->name('profile.edit');
     
+
     // Admin routes
     Route::middleware(EnsureUserIsAdmin::class)->prefix('admin')->name('admin.')->group(function () {
         // Dashboard
@@ -74,6 +75,8 @@ Route::middleware('auth')->group(function () {
         // Transactions
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
         Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
+        Route::get('/transactions/{transaction}/print', [TransactionController::class, 'print'])->name('transactions.print');
+        Route::get('/transactions/{transaction}/download', [TransactionController::class, 'download'])->name('transactions.download');
         
         // Financial Reports
         Route::get('/financial-reports', [FinancialReportController::class, 'index'])->name('financial-reports.index');
@@ -111,6 +114,8 @@ Route::middleware('auth')->group(function () {
         // Transactions
         Route::get('/transactions', [TransactionController::class, 'cashierIndex'])->name('transactions.index');
         Route::get('/transactions/{transaction}', [TransactionController::class, 'cashierShow'])->name('transactions.show');
+        Route::get('/transactions/{transaction}/print', [TransactionController::class, 'cashierPrint'])->name('transactions.print');
+        Route::get('/transactions/{transaction}/download', [TransactionController::class, 'cashierDownload'])->name('transactions.download');
         
         // Groq AI Assistant
         Route::get('/groq-assistant', [GroqAIController::class, 'assistant'])->name('groq-assistant'); // Tambahkan route GET ini

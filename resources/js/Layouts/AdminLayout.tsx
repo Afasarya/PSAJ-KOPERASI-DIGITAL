@@ -43,7 +43,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => {
     { name: 'Laporan Keuangan', href: route('admin.financial-reports.index'), icon: BarChart4 },
     { name: 'Pengguna', href: route('admin.users.index'), icon: Users },
     { name: 'Groq AI', href: route('admin.groq-ai.index'), icon: Zap },
-    { name: 'Pengaturan', href: route('admin.settings.index'), icon: Settings },
   ];
 
   return (
@@ -53,7 +52,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => {
         <div className="flex min-h-0 flex-1 flex-col border-r bg-card">
           <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
             <div className="flex flex-shrink-0 items-center px-4">
-              <h1 className="text-xl font-bold text-primary">Koperasi SMPN 1</h1>
+              <h1 className="text-xl font-bold text-primary">Koperasi Digital</h1>
             </div>
             <nav className="mt-5 flex-1 space-y-1 px-2">
               {navigation.map((item) => (

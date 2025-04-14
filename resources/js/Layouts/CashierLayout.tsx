@@ -31,7 +31,6 @@ const CashierLayout: React.FC<CashierLayoutProps> = ({ children, title }) => {
     { name: 'Dashboard', href: route('cashier.dashboard'), icon: Home },
     { name: 'Kasir (POS)', href: route('cashier.pos.index'), icon: CreditCard },
     { name: 'Riwayat Transaksi', href: route('cashier.transactions.index'), icon: FileText },
-    { name: 'Profil', href: route('profile.edit'), icon: User },
   ];
 
   return (
@@ -41,7 +40,7 @@ const CashierLayout: React.FC<CashierLayoutProps> = ({ children, title }) => {
         <div className="flex min-h-0 flex-1 flex-col border-r bg-card">
           <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
             <div className="flex flex-shrink-0 items-center px-4">
-              <h1 className="text-xl font-bold text-primary">Koperasi SMPN 1</h1>
+              <h1 className="text-xl font-bold text-primary">Koperasi Digital</h1>
             </div>
             <nav className="mt-5 flex-1 space-y-1 px-2">
               {navigation.map((item) => (
