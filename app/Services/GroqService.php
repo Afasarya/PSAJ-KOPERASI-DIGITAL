@@ -37,28 +37,28 @@ class GroqService
     ];
     
     public function __construct()
-    {
-        $this->apiKey = config('services.groq.api_key');
-        $this->apiUrl = config('services.groq.api_url', 'https://api.groq.com/openai/v1/');
-        
-        // Menggunakan model default yang lebih baru jika model dari config tidak tersedia
-        $this->model = config('services.groq.api_model', 'llama-3.1-70b-instant');
-        
-        // Cek API key - jika kosong atau placeholder, aktifkan mode fallback
-        if (empty($this->apiKey) || $this->apiKey === 'your-api-key-here' || $this->apiKey === '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') {
-            $this->useFallback = true;
-            Log::warning('Groq API: Using fallback mode due to missing or placeholder API key');
-        } else {
-            $this->client = new Client([
-                'base_uri' => $this->apiUrl,
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $this->apiKey,
-                    'Content-Type' => 'application/json',
-                ],
-                'http_errors' => false, // Mencegah exception pada respons HTTP error
-            ]);
-        }
+{
+    $this->apiKey = config('services.groq.api_key');
+    // Remove the trailing part as it's added in the requests
+    $this->apiUrl = rtrim(config('services.groq.api_url', 'https://api.groq.com/openai/v1/'), '/');
+    
+    // Simplified model assignment
+    $this->model = config('services.groq.api_model', 'llama-3.3-70b-versatile');
+    
+    // Only check if API key is completely empty or default placeholder
+    if (empty($this->apiKey) || $this->apiKey === 'your-api-key-here') {
+        $this->useFallback = true;
+        Log::warning('Groq API: Using fallback mode due to missing API key');
+    } else {
+        $this->client = new Client([
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ],
+            'http_errors' => false,
+        ]);
     }
+}
     
     /**
      * Chat with Groq AI Assistant
@@ -68,89 +68,89 @@ class GroqService
      * @return string
      */
     public function chatWithAssistant(string $message, array $history = [])
-    {
-        // Jika mode fallback aktif, gunakan respons yang telah ditentukan
-        if ($this->useFallback) {
-            Log::info('Groq AI: Using fallback response for message: ' . $message);
-            return $this->getFallbackResponse($message);
-        }
-        
-        // Format the conversation history
-        $messages = [
-            ['role' => 'system', 'content' => 'You are a helpful assistant for a school cooperative store. ' .
-                                            'You can provide information about products, inventory, sales processes, ' .
-                                            'and general cooperative management. Keep responses concise and relevant to the context. ' . 
-                                            'Respond in Bahasa Indonesia.'],
-        ];
-        
-        // Add history messages
-        foreach ($history as $historyItem) {
-            $messages[] = [
-                'role' => $historyItem['role'],
-                'content' => $historyItem['content'],
-            ];
-        }
-        
-        // Add the current user message
-        $messages[] = ['role' => 'user', 'content' => $message];
-        
-        try {
-            Log::info('Sending request to Groq API with model: ' . $this->model);
-            
-            $startTime = microtime(true);
-            
-            $response = $this->client->post('chat/completions', [
-                'json' => [
-                    'model' => $this->model,
-                    'messages' => $messages,
-                    'temperature' => 0.7,
-                    'max_tokens' => 800,
-                ],
-            ]);
-            
-            $processingTime = microtime(true) - $startTime;
-            $responseBody = json_decode($response->getBody()->getContents(), true);
-            
-            // Check for API error
-            if ($response->getStatusCode() !== 200) {
-                Log::error('Groq API error response: ' . json_encode($responseBody));
-                // Jika API error, gunakan fallback response
-                return $this->getFallbackResponse($message);
-            }
-            
-            // Log the API call
-            $this->logApiCall(
-                'chat/completions',
-                'chatbot',
-                $message,
-                $responseBody,
-                $responseBody['usage']['total_tokens'] ?? null,
-                $processingTime,
-                true
-            );
-            
-            // Return the assistant's response
-            return $responseBody['choices'][0]['message']['content'];
-            
-        } catch (\Exception $e) {
-            // Log the error with detailed information
-            Log::error('Groq API error (chatbot): ' . $e->getMessage());
-            
-            $this->logApiCall(
-                'chat/completions',
-                'chatbot',
-                $message,
-                null,
-                null,
-                null,
-                false,
-                $e->getMessage()
-            );
-            
-            // Return fallback message
-            return $this->getFallbackResponse($message);
-        }
+{
+    // Jika mode fallback aktif, gunakan respons yang telah ditentukan
+    if ($this->useFallback) {
+        return $this->getFallbackResponse($message);
     }
+    
+    // Format the conversation history
+    $messages = [
+        ['role' => 'system', 'content' => 'You are a helpful assistant for a school cooperative store. ' .
+                                        'You can provide information about products, inventory, sales processes, ' .
+                                        'and general cooperative management. Keep responses concise and relevant to the context. ' . 
+                                        'Respond in Bahasa Indonesia.'],
+    ];
+    
+    // Add history messages
+    foreach ($history as $historyItem) {
+        $messages[] = [
+            'role' => $historyItem['role'],
+            'content' => $historyItem['content'],
+        ];
+    }
+    
+    // Add the current user message
+    $messages[] = ['role' => 'user', 'content' => $message];
+    
+    try {
+        Log::info('Sending request to Groq API with model: ' . $this->model);
+        
+        $startTime = microtime(true);
+        
+        // Fix: Use the correct endpoint path
+        $response = $this->client->post($this->apiUrl . '/chat/completions', [
+            'json' => [
+                'model' => $this->model,
+                'messages' => $messages,
+                'temperature' => 0.7,
+                'max_tokens' => 800,
+            ],
+        ]);
+        
+        $processingTime = microtime(true) - $startTime;
+        $responseBody = json_decode($response->getBody()->getContents(), true);
+        
+        // Check for API error
+        if ($response->getStatusCode() !== 200) {
+            Log::error('Groq API error response: ' . json_encode($responseBody));
+            // Jika API error, gunakan fallback response
+            return $this->getFallbackResponse($message);
+        }
+        
+        // Log the API call
+        $this->logApiCall(
+            'chat/completions',
+            'chatbot',
+            $message,
+            $responseBody,
+            $responseBody['usage']['total_tokens'] ?? null,
+            $processingTime,
+            true
+        );
+        
+        // Return the assistant's response
+        return $responseBody['choices'][0]['message']['content'];
+        
+    } catch (\Exception $e) {
+        // Log the error with detailed information
+        Log::error('Groq API error (chatbot): ' . $e->getMessage());
+        
+        $this->logApiCall(
+            'chat/completions',
+            'chatbot',
+            $message,
+            null,
+            null,
+            null,
+            false,
+            $e->getMessage()
+        );
+        
+        // Return fallback message
+        return $this->getFallbackResponse($message);
+    }
+}
     
     /**
      * Get fallback response based on user message
@@ -417,16 +417,110 @@ class GroqService
      * @return void
      */
     public function detectAnomalies(Transaction $transaction)
-    {
-        // Jika mode fallback aktif, skip proses deteksi anomali
-        if ($this->useFallback) {
-            Log::info('Groq AI: Skipping anomaly detection due to fallback mode');
-            return;
+{
+    // Jika mode fallback aktif, skip proses deteksi anomali
+    if ($this->useFallback) {
+        Log::info('Groq AI: Skipping anomaly detection due to fallback mode');
+        return;
+    }
+    
+    try {
+        // Get transaction details with items
+        $transaction->load('items.product', 'user');
+        
+        // Create a prompt for anomaly detection
+        $prompt = "Analyze this transaction for anomalies:\n";
+        $prompt .= "Transaction ID: {$transaction->id}\n";
+        $prompt .= "Invoice: {$transaction->invoice_number}\n";
+        $prompt .= "Amount: {$transaction->total_amount}\n";
+        $prompt .= "Items:\n";
+        
+        foreach ($transaction->items as $item) {
+            $prompt .= "- {$item->product->name} x {$item->quantity} @ {$item->price}\n";
         }
         
-        // Rest of the function remains the same
-        // ...
+        $startTime = microtime(true);
+        
+        // Fixed URL construction
+        $response = $this->client->post($this->apiUrl . '/chat/completions', [
+            'json' => [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'You are an AI fraud detector. Analyze transactions and detect anomalies.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'max_tokens' => 500,
+                'temperature' => 0.2
+            ],
+        ]);
+        
+        $processingTime = microtime(true) - $startTime;
+        $responseBody = json_decode($response->getBody()->getContents(), true);
+        
+        // Log the API call
+        $this->logApiCall(
+            'chat/completions',
+            'anomaly_detection',
+            $prompt,
+            $responseBody,
+            $responseBody['usage']['total_tokens'] ?? null,
+            $processingTime,
+            $response->getStatusCode() === 200
+        );
+        
+        // Only proceed if response is successful
+        if ($response->getStatusCode() !== 200) {
+            throw new \Exception('API error: ' . ($responseBody['error']['message'] ?? 'Unknown error'));
+        }
+        
+        // Parse response to determine if anomaly exists
+        $content = $responseBody['choices'][0]['message']['content'];
+        
+        // Enhanced detection logic
+        $anomalyDetected = false;
+        $anomalyType = null;
+        $confidenceScore = 0.0;
+        
+        if (strpos(strtolower($content), 'anomaly') !== false || 
+            strpos(strtolower($content), 'suspicious') !== false) {
+            $anomalyDetected = true;
+            
+            // Determine type
+            if (strpos(strtolower($content), 'price') !== false) {
+                $anomalyType = 'price_anomaly';
+                $confidenceScore = 0.7;
+            } elseif (strpos(strtolower($content), 'quantity') !== false) {
+                $anomalyType = 'quantity_anomaly';
+                $confidenceScore = 0.8;
+            } else {
+                $anomalyType = 'pattern_anomaly';
+                $confidenceScore = 0.6;
+            }
+            
+            // Create anomaly record
+            TransactionAnomaly::create([
+                'transaction_id' => $transaction->id,
+                'anomaly_type' => $anomalyType,
+                'confidence_score' => $confidenceScore,
+                'is_reviewed' => false
+            ]);
+        }
+        
+    } catch (\Exception $e) {
+        Log::error('Error detecting transaction anomalies: ' . $e->getMessage());
+        
+        $this->logApiCall(
+            'chat/completions',
+            'anomaly_detection',
+            $prompt ?? 'Error generating prompt',
+            null,
+            null,
+            null,
+            false,
+            $e->getMessage()
+        );
     }
+}
     
     /**
      * Generate stock predictions for products

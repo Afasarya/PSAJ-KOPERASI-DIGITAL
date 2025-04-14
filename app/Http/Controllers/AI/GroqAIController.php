@@ -8,6 +8,7 @@ use App\Models\GroqPromptTemplate;
 use App\Models\TransactionAnomaly;
 use App\Services\GroqService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class GroqAIController extends Controller
@@ -71,37 +72,71 @@ class GroqAIController extends Controller
         switch ($period) {
             case 'day':
                 $startDate = $startDate->subDay();
-                $groupBy = 'HOUR(created_at)';
-                $format = '%H:00';
                 break;
             case 'week':
                 $startDate = $startDate->subWeek();
-                $groupBy = 'DATE(created_at)';
-                $format = '%Y-%m-%d';
                 break;
             case 'month':
                 $startDate = $startDate->subMonth();
-                $groupBy = 'DATE(created_at)';
-                $format = '%Y-%m-%d';
                 break;
             case 'year':
                 $startDate = $startDate->subYear();
-                $groupBy = 'MONTH(created_at)';
-                $format = '%Y-%m';
                 break;
             default:
                 $startDate = $startDate->subWeek();
-                $groupBy = 'DATE(created_at)';
-                $format = '%Y-%m-%d';
         }
         
-        // Get usage data
-        $usageData = GroqApiLog::selectRaw("DATE_FORMAT(created_at, '{$format}') as date, COUNT(*) as request_count, SUM(tokens_used) as tokens_used, AVG(processing_time) as avg_processing_time")
-            ->where('created_at', '>=', $startDate)
-            ->groupByRaw($groupBy)
+        // Get raw data first
+        $logs = GroqApiLog::where('created_at', '>=', $startDate)
             ->orderBy('created_at')
             ->get();
             
+        // Group data using PHP instead of SQL
+        $usageData = [];
+        
+        foreach ($logs as $log) {
+            $date = $log->created_at;
+            
+            // Format the date based on period
+            $dateKey = match($period) {
+                'day' => $date->format('H:00'),
+                'week', 'month' => $date->format('Y-m-d'),
+                'year' => $date->format('Y-m'),
+                default => $date->format('Y-m-d')
+            };
+            
+            if (!isset($usageData[$dateKey])) {
+                $usageData[$dateKey] = [
+                    'date' => $dateKey,
+                    'request_count' => 0,
+                    'tokens_used' => 0,
+                    'total_processing_time' => 0,
+                    'processing_count' => 0,
+                ];
+            }
+            
+            $usageData[$dateKey]['request_count']++;
+            $usageData[$dateKey]['tokens_used'] += $log->tokens_used ?? 0;
+            
+            if ($log->processing_time !== null) {
+                $usageData[$dateKey]['total_processing_time'] += $log->processing_time;
+                $usageData[$dateKey]['processing_count']++;
+            }
+        }
+        
+        // Calculate averages and format final result
+        $result = [];
+        foreach ($usageData as $data) {
+            $result[] = [
+                'date' => $data['date'],
+                'request_count' => $data['request_count'],
+                'tokens_used' => $data['tokens_used'],
+                'avg_processing_time' => $data['processing_count'] > 0 
+                    ? $data['total_processing_time'] / $data['processing_count'] 
+                    : null
+            ];
+        }
+        
         // Get top operations
         $topOperations = GroqApiLog::selectRaw('operation_type, COUNT(*) as count')
             ->where('created_at', '>=', $startDate)
@@ -121,7 +156,7 @@ class GroqAIController extends Controller
         ];
         
         return Inertia::render('Admin/GroqAI/Usage', [
-            'usageData' => $usageData,
+            'usageData' => $result,
             'topOperations' => $topOperations,
             'successVsFailure' => $successVsFailure,
             'period' => $period,
@@ -197,12 +232,13 @@ class GroqAIController extends Controller
      * Menangani API chat dengan Groq Assistant
      */
     public function chat(Request $request)
-    {
-        $validated = $request->validate([
-            'message' => 'required|string',
-            'history' => 'nullable|array',
-        ]);
-        
+{
+    $validated = $request->validate([
+        'message' => 'required|string',
+        'history' => 'nullable|array',
+    ]);
+    
+    try {
         $response = $this->groqService->chatWithAssistant(
             $validated['message'],
             $validated['history'] ?? []
@@ -210,6 +246,16 @@ class GroqAIController extends Controller
         
         return response()->json([
             'response' => $response,
+            'success' => true,
         ]);
+    } catch (\Exception $e) {
+        Log::error('Groq Assistant Chat Error: ' . $e->getMessage());
+        
+        return response()->json([
+            'response' => 'Maaf, saya mengalami kendala teknis saat ini. Silakan coba lagi dalam beberapa saat.',
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 }
